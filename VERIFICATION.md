@@ -374,6 +374,8 @@ may fail and the registry may need verifying through the explorer UI instead.
 - **No live paid-call conformance run yet.** The source project this was forked from ships a
   conformance suite of real paid calls against production. That harness has not been ported, and
   claiming its results here would be a lie. It is the top roadmap item.
-- **Tool outputs are checked against fixtures and live reads, but the service has limited
-  production traffic.** The settlement monitor shows exactly what has been paid, including zero,
-  and deliberately distinguishes "nothing yet" from "could not read".
+- **One settled payment is not traction.** The single settlement in §17 was self-funded: the
+  buyer wallet is also the author's. It proves the rail works end to end and nothing more. The
+  monitor shows exactly what has been paid, and deliberately distinguishes "nothing yet" from
+  "could not read".
+- **The service has no third-party usage.** No independent agent has paid for a call.

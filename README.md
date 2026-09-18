@@ -138,6 +138,20 @@ forge test
 
 ## Status
 
+Live on Arc mainnet, with a settled payment through the paywall:
+
+```
+Gateway transfer 6b757aad-ae4b-4c2b-8e12-ccf83a125be0   status: completed
+0.001 USDC   0x9c1d…9b66 -> 0x0704…73b1   eip155:5042   2026-09-18T22:43:11Z
+```
+
+Visible at [`/monitor`](https://arc-agent-toolkit-prod.ktcod.workers.dev/monitor) and in Circle's
+own `GET /v1/x402/transfers`. `txHash` is null because Nanopayments settle in batches, so the
+Gateway transfer id is the durable identifier.
+
+That settlement was a self-funded smoke test — the buyer wallet is also mine. It proves the rail
+end to end. It is not traction, and is not presented as any.
+
 Built for [Arc Microgrants](https://dorahacks.io/hackathon/arc-microgrants/detail).
 
 **Roadmap:** a live conformance harness of real paid calls; `arc_fx_activity` once StableFX is
