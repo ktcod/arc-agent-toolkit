@@ -28,11 +28,14 @@ describe("attributing a settlement to a tool", () => {
 });
 
 describe("toSettlements", () => {
+  // Field names copied from a REAL GET /v1/x402/transfers response (2026-09-18). Gateway uses
+  // toAddress/fromAddress/txHash, NOT the x402 protocol's payTo/payer/transactionHash.
   const rows = [
-    { id: "t1", createdAt: "2026-09-18T10:00:00Z", amount: "2000", payer: "0xA", payTo: PAY_TO },
-    { id: "t2", createdAt: "2026-09-18T11:00:00Z", amount: "1000", payer: "0xB", payTo: PAY_TO },
-    // Outbound, or destined elsewhere: must not be counted as revenue.
-    { id: "t3", createdAt: "2026-09-18T12:00:00Z", amount: "9000", payer: "0xC", payTo: "0xdead" },
+    { id: "t1", status: "received", createdAt: "2026-09-18T10:00:00Z", amount: "2000", fromAddress: "0xA", toAddress: PAY_TO, txHash: null },
+    { id: "t2", status: "received", createdAt: "2026-09-18T11:00:00Z", amount: "1000", fromAddress: "0xB", toAddress: PAY_TO, txHash: null },
+    // Another seller entirely. Gateway ignores the payTo query filter and returns these, so the
+    // client-side filter is the only thing keeping strangers' payments off a public page.
+    { id: "t3", status: "received", createdAt: "2026-09-18T12:00:00Z", amount: "50000", fromAddress: "0x718cef2764b833ea0358e51b1171d1b0a55a8587", toAddress: "0x7c9a886c485a33a9636a685c867eafbd15515e86", txHash: null },
   ];
 
   it("counts only value arriving at the payout address", () => {
@@ -48,6 +51,37 @@ describe("toSettlements", () => {
 
   it("matches the payout address case-insensitively", () => {
     expect(toSettlements(rows, PAY_TO.toLowerCase(), specs)).toHaveLength(2);
+  });
+
+  it("excludes other sellers, because Gateway ignores the payTo query filter", () => {
+    // Verified live: a request filtered to one address returned 50 rows, 1 of them ours.
+    // Without this filter the public monitor would publish strangers' payment records.
+    const out = toSettlements(rows, PAY_TO, specs);
+    expect(out.map((s) => s.transferId)).not.toContain("t3");
+    expect(out.every((s) => s.payer !== "0x718cef2764b833ea0358e51b1171d1b0a55a8587")).toBe(true);
+  });
+
+  it("returns nothing rather than everything when no payout address is configured", () => {
+    // An empty target must never degrade into "match all".
+    expect(toSettlements(rows, "", specs)).toHaveLength(0);
+  });
+
+  it("reads the real Gateway row for the first settled payment on this service", () => {
+    const real = [{
+      id: "6b757aad-ae4b-4c2b-8e12-ccf83a125be0",
+      status: "received",
+      createdAt: "2026-09-18T22:43:11.940Z",
+      amount: "1000",
+      fromAddress: "0x9c1d17a47db9f3ef9eeaf747023e2a7cc29c9b66",
+      toAddress: "0x0704d068846ad778b4277c249642e65ae64473b1",
+      txHash: null,
+    }];
+    const [s] = toSettlements(real, "0x0704D068846AD778b4277c249642E65Ae64473b1", specs);
+    expect(s.amountUsdc).toBe(0.001);
+    expect(s.transferId).toBe("6b757aad-ae4b-4c2b-8e12-ccf83a125be0");
+    expect(s.payer).toBe("0x9c1d17a47db9f3ef9eeaf747023e2a7cc29c9b66");
+    // Batched settlement: no per-payment tx hash until the batch lands.
+    expect(s.txHash).toBeNull();
   });
 
   it("carries the Gateway transfer id, since batched settlement has no per-payment tx hash", () => {

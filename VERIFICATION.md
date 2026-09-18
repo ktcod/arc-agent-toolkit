@@ -298,7 +298,49 @@ Confirmed working afterwards, against the live service:
 The second is worth writing down: it looked at first like a new bug, and it is simply Gateway
 correctly refusing a key that everybody has.
 
-## 17. Blockscout's API is not reachable from a server
+## 17. A payment settled on Arc mainnet
+
+First real settlement, 2026-09-18, from `GET /v1/x402/transfers`:
+
+```json
+{ "id": "6b757aad-ae4b-4c2b-8e12-ccf83a125be0", "status": "received",
+  "sendingNetwork": "eip155:5042", "recipientNetwork": "eip155:5042",
+  "fromAddress": "0x9c1d17a47db9f3ef9eeaf747023e2a7cc29c9b66",
+  "toAddress":   "0x0704d068846ad778b4277c249642e65ae64473b1",
+  "amount": "1000", "txHash": null,
+  "createdAt": "2026-09-18T22:43:11.940Z" }
+```
+
+0.001 USDC — the `arc_gas_quote` price — paid by an independent buyer wallet to the seller, and
+visible at `/monitor`. `txHash` is null because Nanopayments settle in batches; the Gateway
+transfer id is the durable identifier until the batch lands.
+
+## 18. Gateway ignores the payTo filter, and the monitor's field names were wrong
+
+Two bugs in the settlement monitor, both found only because a real payment finally existed to
+look for. Until then the page said "0 settlements" and looked perfectly healthy.
+
+**Wrong field names.** Gateway returns `toAddress`, `fromAddress` and `txHash`. The x402 protocol
+calls those `payTo`, `payer` and `transactionHash`, and the monitor was written from the protocol
+spec rather than from a real response. Every field read `undefined`, so no row ever matched and
+the page reported zero.
+
+**The server-side filter does nothing.** A request explicitly filtered to one seller —
+`GET /v1/x402/transfers?payTo=<addr>&network=eip155:5042` — returned **50 transfers, of which 1
+was ours**. Gateway returns every seller's payments on the network regardless of the parameter.
+
+**Consequence.** The client-side address filter in `toSettlements` is a **privacy control**, not
+a tidying step. Without it the public `/monitor` page would publish 49 strangers' payment
+records, with counterparty addresses and amounts. It is now commented as load-bearing, it
+returns nothing rather than everything when no payout address is configured, and tests pin both
+behaviours using a real foreign transfer as a fixture.
+
+Worth noting how close this came to being a leak rather than a blank page: the filter compared
+against `t.payTo`, which was always `undefined`, so it matched nothing. It failed safe by
+accident. Had the field names happened to line up while the filter logic was wrong, the same
+bug would have published other people's transactions.
+
+## 19. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.

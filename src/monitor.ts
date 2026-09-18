@@ -17,14 +17,25 @@ import type { PaidToolSpec } from "./tools/index.js";
 const SOURCE = "Circle Gateway";
 const USDC_DECIMALS = 6;
 
+/**
+ * One row from GET /v1/x402/transfers.
+ *
+ * Field names verified against the live API 2026-09-18. They are NOT the x402 protocol's names:
+ * the protocol says payTo/payer, Gateway returns toAddress/fromAddress, and the settlement hash
+ * is txHash rather than transactionHash. Guessing from the protocol spec yields an object whose
+ * every field reads undefined, and a monitor that silently reports nothing.
+ */
 interface GatewayTransfer {
   id?: string;
+  status?: string;
   createdAt?: string;
   amount?: string;
-  payer?: string;
-  payTo?: string;
-  network?: string;
-  transactionHash?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  sendingNetwork?: string;
+  recipientNetwork?: string;
+  /** Null until the batch carrying this payment lands onchain. */
+  txHash?: string | null;
 }
 
 export interface Settlement {
@@ -70,17 +81,27 @@ export function toolsForAmount(amountUsdc: number, specs: PaidToolSpec[]): strin
     .map((s) => s.name);
 }
 
-/** Normalize Gateway's transfer list into settlements. Pure; no network. */
+/**
+ * Normalize Gateway's transfer list into settlements. Pure; no network.
+ *
+ * THE ADDRESS FILTER IS LOAD-BEARING, NOT COSMETIC. Verified 2026-09-18: Gateway ignores the
+ * `payTo` query parameter and returns transfers for EVERY seller on the network — a request
+ * filtered to one address came back with 50 rows of which 1 was ours. Without this filter the
+ * public monitor page would publish 49 strangers' payment records, complete with counterparty
+ * addresses and amounts. Never remove it, and never trust the server-side filter to have
+ * narrowed anything.
+ */
 export function toSettlements(
   items: GatewayTransfer[],
   payTo: string,
   specs: PaidToolSpec[],
 ): Settlement[] {
-  const target = payTo.toLowerCase();
+  const target = payTo.trim().toLowerCase();
+  if (!target) return [];
   const out: Settlement[] = [];
   for (const t of items) {
-    // Count only value arriving AT the payout address.
-    if ((t.payTo ?? "").toLowerCase() !== target) continue;
+    // Count only value arriving AT our payout address. See the note above.
+    if ((t.toAddress ?? "").toLowerCase() !== target) continue;
     if (!t.amount) continue;
     const amount = Number(t.amount) / 10 ** USDC_DECIMALS;
     if (!Number.isFinite(amount)) continue;
@@ -89,8 +110,8 @@ export function toSettlements(
       timestamp: t.createdAt ?? null,
       amountUsdc: amount,
       transferId: t.id ?? null,
-      txHash: t.transactionHash ?? null,
-      payer: t.payer ?? null,
+      txHash: t.txHash ?? null,
+      payer: t.fromAddress ?? null,
       tool: candidates.length === 1 ? candidates[0] : null,
       toolCandidates: candidates,
     });
