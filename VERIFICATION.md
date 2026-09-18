@@ -340,7 +340,25 @@ against `t.payTo`, which was always `undefined`, so it matched nothing. It faile
 accident. Had the field names happened to line up while the filter logic was wrong, the same
 bug would have published other people's transactions.
 
-## 19. Blockscout's API is not reachable from a server
+## 19. Repeat calls are charged separately (payment nonces are random)
+
+A paywall that accepted one authorization and then served forever inside its validity window
+would be a revenue bug, and Arc's challenge advertises `minValiditySeconds: 604800` — seven days.
+Worth ruling out rather than assuming.
+
+**Checked.** `BatchEvmScheme.createPaymentPayload` calls `createNonce()`. Signing the *same*
+requirements twice produces different nonces:
+
+```
+nonce #1: 0xf5388cbcb85fe5b9274e89a0d5f26ee291eb5f47ac350211eca0a5dbc325c5d7
+nonce #2: 0xc8a157939b29bfef7e4c85099c3dfa78281b66b6aa8fb30ebff1ab463437ff32
+```
+
+**Consequence.** Each call carries a distinct authorization and settles as its own Gateway
+transfer, so an agent making N calls pays N times. The long validity window governs how long a
+single signed authorization stays redeemable, not how many calls it covers.
+
+## 20. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.
