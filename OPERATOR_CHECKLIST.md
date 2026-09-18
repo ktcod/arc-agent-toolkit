@@ -21,7 +21,7 @@ matters top to bottom.
 
 ## 1. Confirm your payout address
 
-The default in `wrangler.toml` is `0x9C1D17a47DB9F3eF9Eeaf747023E2a7CC29c9b66`. Change it in
+The default in `wrangler.toml` is `0x0704D068846AD778b4277c249642E65Ae64473b1`. Change it in
 both `[vars]` and `[env.production.vars]` if you are not that person.
 
 This address is **public by design**: the monitor publishes it so anyone can audit settlements.

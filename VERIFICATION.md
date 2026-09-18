@@ -160,7 +160,7 @@ scheme            : exact
 network           : eip155:5042
 asset             : 0x3600000000000000000000000000000000000000
 amount            : 1000   (atomic, 6dp => 0.001 USDC)
-payTo             : 0x9C1D17a47DB9F3eF9Eeaf747023E2a7CC29c9b66
+payTo             : 0x0704D068846AD778b4277c249642E65Ae64473b1
 extra.name        : GatewayWalletBatched
 extra.verifyingContract : 0x77777777dcc4d5a8b6e418fd04d8997ef11000ee
 ```
@@ -241,7 +241,29 @@ This is worth stating plainly: the phrase "fix the paywall" would have sent most
 server. The server was fine. The client was wrong, and only a test that distinguishes
 `insufficient_balance` from `invalid_signature` tells you which.
 
-## 15. Blockscout's API is not reachable from a server
+## 15. The payout address was rotated after a key exposure
+
+The original payout wallet `0x9C1D…9b66` had its private key exposed during development: it was
+passed as an inline shell environment assignment, which writes it to `~/.zsh_history` in
+plaintext, and the transcript was then copied into a chat.
+
+`PAYOUT_WALLET_ADDRESS` now points at `0x0704D068846AD778b4277c249642E65Ae64473b1`, a fresh EOA
+(checksum valid, `eth_getCode` empty, nonce 0 at the time of the change).
+
+Two things this repo changed as a result, because a procedure that depends on people not making
+an easy mistake is a bad procedure:
+
+- Both buyer scripts now **prompt for the key with terminal echo disabled** instead of taking it
+  from the command line. The environment variable still works for CI, but it is no longer the
+  documented path.
+- The key validator accepts **bare 64-hex as well as `0x`-prefixed**, because MetaMask exports
+  the bare form. Rejecting a valid key is not a harmless annoyance: it sends people looking for
+  somewhere to paste it in order to work out why.
+
+Local scrubbing of history files was verified, but it does not undo the exposure. The key left
+the machine, so rotation was the only real remedy.
+
+## 16. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.

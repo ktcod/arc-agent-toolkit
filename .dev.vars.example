@@ -1,7 +1,7 @@
 # Local development. Copy to .dev.vars (gitignored) and fill in.
 # NEVER put a private key here. This file's real counterpart is gitignored; this example is not.
 
-PAYOUT_WALLET_ADDRESS=0x9C1D17a47DB9F3eF9Eeaf747023E2a7CC29c9b66
+PAYOUT_WALLET_ADDRESS=0x0704D068846AD778b4277c249642E65Ae64473b1
 X402_MODE=sandbox
 X402_NETWORK=eip155:5042002
 X402_FACILITATOR_URL=https://gateway-api-testnet.circle.com
