@@ -1,0 +1,33 @@
+# Cloudflare Workers config for arc-agent-toolkit.
+#
+# Two deployments from one codebase:
+#   - default    (sandbox, Arc Testnet, Circle Gateway testnet):  wrangler deploy
+#   - production (Arc mainnet, Circle Gateway mainnet):           wrangler deploy --env production
+#
+# PAYOUT_WALLET_ADDRESS is a PUBLIC address and lives here on purpose: the monitor publishes it
+# anyway, and keeping it in config rather than a secret means one less deploy step. It is still
+# overridable with `wrangler secret put PAYOUT_WALLET_ADDRESS`.
+#
+# There are NO secrets in this file, and this repo is public. Never add one.
+
+name = "arc-agent-toolkit"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ---- Sandbox (default): Arc Testnet ----
+[vars]
+X402_MODE = "sandbox"
+X402_NETWORK = "eip155:5042002"
+X402_FACILITATOR_URL = "https://gateway-api-testnet.circle.com"
+PAYOUT_WALLET_ADDRESS = "0x9C1D17a47DB9F3eF9Eeaf747023E2a7CC29c9b66"
+
+# ---- Production: Arc mainnet ----
+[env.production]
+name = "arc-agent-toolkit-prod"
+
+[env.production.vars]
+X402_MODE = "production"
+X402_NETWORK = "eip155:5042"
+X402_FACILITATOR_URL = "https://gateway-api.circle.com"
+PAYOUT_WALLET_ADDRESS = "0x9C1D17a47DB9F3eF9Eeaf747023E2a7CC29c9b66"

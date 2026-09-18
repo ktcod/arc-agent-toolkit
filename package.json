@@ -1,0 +1,71 @@
+{
+  "name": "arc-agent-toolkit",
+  "version": "0.1.0",
+  "description": "Pay-per-call MCP tools for Arc, settled in USDC on Arc mainnet via Circle Nanopayments.",
+  "type": "module",
+  "main": "dist/node.js",
+  "bin": {
+    "x402-json-repair-mcp": "dist/node.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "server.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "wrangler dev",
+    "dev:node": "tsx watch src/node.ts",
+    "start": "node dist/node.js",
+    "deploy": "wrangler deploy",
+    "gen:docs": "node scripts/gen-docs.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "x402",
+    "micropayments",
+    "usdc",
+    "base",
+    "json-repair",
+    "json-schema",
+    "agent-payments",
+    "cloudflare-workers"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@hono/mcp": "^0.3.0",
+    "@hono/node-server": "^1.19.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@x402/core": "^2.15.0",
+    "@x402/evm": "^2.15.0",
+    "@x402/extensions": "^2.15.0",
+    "hono": "^4.12.0",
+    "zod": "^3.25.0",
+    "@circle-fin/x402-batching": "^3.5.0",
+    "viem": "^2.52.2"
+  },
+  "optionalDependencies": {
+    "@coinbase/x402": "^2.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260918.1",
+    "@types/node": "^22.10.0",
+    "@x402/fetch": "^2.15.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ktcod/arc-agent-toolkit.git"
+  }
+}
