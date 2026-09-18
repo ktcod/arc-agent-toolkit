@@ -170,7 +170,31 @@ matches the GatewayWallet, so buyers construct the correct EIP-712 signing domai
 `ExactEvmScheme` been registered instead, this field would simply be absent — the server would
 look healthy, issue confident-looking 402s, and every payment would fail at the buyer.
 
-## 12. Blockscout's API is not reachable from a server
+## 12. Arc's Circle Gateway domain is 26, and balances are decimal
+
+Two separate facts the monitor got wrong on the first pass, both caught against the live API.
+
+**The domain.** Gateway uses its own chain numbering, unrelated to the EVM chain id (5042) or to
+CCTP domains. `GET /v1/info` reports Arc Mainnet **and** Arc Testnet as `domain: 26`. Guessing
+returns `{"message":"Invalid request: sources.0.domain: Invalid gateway domain"}` and a 400. The
+request body also needs `sources: [{domain, depositor}]`; a flat `depositor` is rejected as an
+unrecognized key.
+
+**The units.** `balance` is **decimal USDC**, not atomic units. The OpenAPI schema types it as
+`^\d+(\.\d+)?$`, which permits a fractional part, whereas genuinely atomic values elsewhere in
+the same spec use the `Uint256` type. Dividing by 1e6 would under-report revenue by a factor of
+a million — a $12.34 balance would render as $0.00001234.
+
+The live API also returns an undocumented `pendingBatch` field, counted alongside `balance`
+because Gateway settles in batches: showing only settled funds would make freshly-earned revenue
+look as though it had disappeared.
+
+**Consequence.** Worth recording because the monitor's failure mode here was *quiet*. It
+degraded correctly, attaching `balance unavailable: HTTP 400` and rendering `null` rather than
+inventing a figure, so the page stayed honest while the call was wrong. A monitor that had
+defaulted to `0` would have looked perfectly healthy and silently under-reported.
+
+## 13. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.

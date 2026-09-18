@@ -141,27 +141,50 @@ export async function fetchTransfers(
   throw last;
 }
 
-/** Gateway's unified balance for the seller. Keyless. */
+/**
+ * Arc's Circle Gateway domain id.
+ *
+ * This is Gateway's OWN chain numbering and is unrelated to the EVM chain id (5042) or the
+ * CCTP-style domains used elsewhere. Read from GET /v1/info, where Arc Mainnet and Arc Testnet
+ * both report domain 26. Guessing it yields "Invalid gateway domain" and a 400.
+ */
+export const ARC_GATEWAY_DOMAIN = 26;
+
+interface GatewayBalance {
+  domain?: number;
+  depositor?: string;
+  balance?: string;
+  pendingBatch?: string;
+}
+
+/**
+ * The seller's Gateway balance. Keyless.
+ *
+ * `balance` is settled funds; `pendingBatch` is value from authorizations Gateway has accepted
+ * but not yet settled onchain. Both are reported, because showing only the settled figure would
+ * make freshly-earned revenue look like it had vanished.
+ */
 export async function fetchBalance(
   gatewayUrl: string,
   payTo: string,
   deps: { fetch?: typeof fetchJson } = {},
 ): Promise<number | null> {
   const get = deps.fetch ?? fetchJson;
-  const body = await get<{ balances?: Array<{ balance?: string; available?: string }> }>(
-    `${gatewayUrl}/v1/balances`,
-    {
-      source: SOURCE,
-      method: "POST",
-      body: JSON.stringify({ token: "USDC", depositor: payTo }),
-      timeoutMs: HISTORY_TIMEOUT_MS,
-    },
-  );
+  const body = await get<{ balances?: GatewayBalance[] }>(`${gatewayUrl}/v1/balances`, {
+    source: SOURCE,
+    method: "POST",
+    body: JSON.stringify({
+      token: "USDC",
+      sources: [{ domain: ARC_GATEWAY_DOMAIN, depositor: payTo }],
+    }),
+    timeoutMs: HISTORY_TIMEOUT_MS,
+  });
   const first = body.balances?.[0];
-  const raw = first?.available ?? first?.balance;
-  if (raw === undefined) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  if (!first) return null;
+  const settled = Number(first.balance ?? 0);
+  const pending = Number(first.pendingBatch ?? 0);
+  const total = settled + pending;
+  return Number.isFinite(total) ? total : null;
 }
 
 export async function buildSnapshot(

@@ -5,6 +5,8 @@ import {
   toSettlements,
   toolsForAmount,
   fetchTransfers,
+  fetchBalance,
+  ARC_GATEWAY_DOMAIN,
 } from "../src/monitor.js";
 import { UpstreamError } from "../src/upstream/http.js";
 import type { PaidToolSpec } from "../src/tools/index.js";
@@ -93,4 +95,49 @@ describe("an unreadable history is not an empty one", () => {
     expect(snap.settledUsdc).toBeNull();
     expect(snap.warnings.length).toBeGreaterThan(0);
   }, 30_000);
+});
+
+describe("Gateway balance", () => {
+  it("uses Arc's Gateway domain, which is NOT the EVM chain id", async () => {
+    // Read from GET /v1/info: Arc reports Gateway domain 26, while its EVM chain id is 5042.
+    // Sending the chain id here returns "Invalid gateway domain" and a 400.
+    expect(ARC_GATEWAY_DOMAIN).toBe(26);
+    let sentBody: unknown;
+    await fetchBalance("https://g", PAY_TO, {
+      fetch: (async (_url: string, opts: { body?: string }) => {
+        sentBody = JSON.parse(opts.body ?? "{}");
+        return { balances: [{ domain: 26, balance: "1.5", pendingBatch: "0.5" }] };
+      }) as never,
+    });
+    expect(sentBody).toEqual({
+      token: "USDC",
+      sources: [{ domain: 26, depositor: PAY_TO }],
+    });
+  });
+
+  it("counts pending batch value, so fresh revenue does not look lost", async () => {
+    // Gateway reports DECIMAL USDC here, not atomic units: the OpenAPI schema types `balance`
+    // as ^\d+(\.\d+)?$, which permits a fractional part (atomic values elsewhere in the same
+    // spec use the Uint256 type). Dividing by 1e6 would under-report by a million.
+    const total = await fetchBalance("https://g", PAY_TO, {
+      fetch: (async () => ({
+        balances: [{ balance: "1.5", pendingBatch: "0.5" }],
+      })) as never,
+    });
+    expect(total).toBe(2);
+  });
+
+  it("does not misread a decimal balance as atomic units", async () => {
+    const v = await fetchBalance("https://g", PAY_TO, {
+      fetch: (async () => ({ balances: [{ balance: "12.34" }] })) as never,
+    });
+    expect(v).toBeCloseTo(12.34, 6); // $12.34, not $12,340,000
+  });
+
+  it("returns null rather than 0 when the depositor is unknown to Gateway", async () => {
+    const v = await fetchBalance("https://g", PAY_TO, {
+      fetch: (async () => ({ balances: [] })) as never,
+    });
+    expect(v).toBeNull();
+  });
 });
