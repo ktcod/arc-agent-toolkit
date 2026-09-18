@@ -20,7 +20,37 @@ asset answers can be verified on-chain instead of trusted.
 - **Design:** [docs/superpowers/specs/2026-09-18-arc-agent-toolkit-design.md](docs/superpowers/specs/2026-09-18-arc-agent-toolkit-design.md)
 - **Deploying it yourself:** [OPERATOR_CHECKLIST.md](OPERATOR_CHECKLIST.md)
 
-## Live on Arc mainnet
+## Live
+
+**Service:** <https://arc-agent-toolkit-prod.ktcod.workers.dev>
+
+| | |
+|---|---|
+| MCP endpoint | `POST /mcp` |
+| Per-tool HTTP | `POST /x402/<tool>` |
+| Health | [`/health`](https://arc-agent-toolkit-prod.ktcod.workers.dev/health) |
+| Discovery | [`/.well-known/x402`](https://arc-agent-toolkit-prod.ktcod.workers.dev/.well-known/x402) · [`/openapi.json`](https://arc-agent-toolkit-prod.ktcod.workers.dev/openapi.json) |
+| Live settlements | [`/monitor`](https://arc-agent-toolkit-prod.ktcod.workers.dev/monitor) |
+| Agent guide | [`/SKILL.md`](https://arc-agent-toolkit-prod.ktcod.workers.dev/SKILL.md) |
+
+Try the free tool, no payment or account needed:
+
+```bash
+curl -s -X POST https://arc-agent-toolkit-prod.ktcod.workers.dev/mcp \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"arc_chain_status","arguments":{}}}'
+```
+
+A paid tool returns **HTTP 402** with a `payment-required` header carrying the Circle Gateway
+EIP-712 domain (`GatewayWalletBatched` at `0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE`):
+
+```bash
+curl -i -X POST https://arc-agent-toolkit-prod.ktcod.workers.dev/x402/arc_gas_quote \
+  -H 'content-type: application/json' -d '{"preset":"swap"}'
+```
+
+## On Arc mainnet
 
 **ArcAssetRegistry:** [`0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211`](https://explorer.arc.io/address/0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211)
 — deployed 2026-09-18, block 21564764, 15 canonical entries.

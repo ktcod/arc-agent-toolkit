@@ -149,7 +149,28 @@ And end-to-end through the tool, with `ARC_REGISTRY_ADDRESS` set:
 back to the built-in table and says so via `registrySource: "builtin"` rather than erroring —
 a registry outage degrades independence, not correctness.
 
-## 11. Blockscout's API is not reachable from a server
+## 11. The deployed service issues a correct Gateway 402 challenge
+
+**Checked** against the live Worker at
+`https://arc-agent-toolkit-prod.ktcod.workers.dev`, by decoding the `payment-required` header
+from an unpaid request to `/x402/arc_gas_quote`:
+
+```
+scheme            : exact
+network           : eip155:5042
+asset             : 0x3600000000000000000000000000000000000000
+amount            : 1000   (atomic, 6dp => 0.001 USDC)
+payTo             : 0x9C1D17a47DB9F3eF9Eeaf747023E2a7CC29c9b66
+extra.name        : GatewayWalletBatched
+extra.verifyingContract : 0x77777777dcc4d5a8b6e418fd04d8997ef11000ee
+```
+
+**Consequence.** This is the end-to-end proof of §7. `extra.verifyingContract` is present and
+matches the GatewayWallet, so buyers construct the correct EIP-712 signing domain. Had the base
+`ExactEvmScheme` been registered instead, this field would simply be absent — the server would
+look healthy, issue confident-looking 402s, and every payment would fail at the buyer.
+
+## 12. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.
