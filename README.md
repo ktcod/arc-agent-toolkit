@@ -61,6 +61,8 @@ A valid signature returns `insufficient_balance` and a corrupted one returns `in
 which together prove the signature and EIP-712 domain are correct and only funding is absent.
 
 To actually settle: `node scripts/fund-gateway.mjs 0.50` once, then `node scripts/pay-http.mjs`.
+Both prompt for the key with hidden input rather than taking it on the command line, where it
+would be written to shell history.
 
 ## On Arc mainnet
 

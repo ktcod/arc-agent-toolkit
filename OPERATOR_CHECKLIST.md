@@ -101,13 +101,17 @@ Then, to settle for real:
       credits you as depositor, **not** a plain transfer to the contract address:
 
 ```bash
-BUYER_PRIVATE_KEY=0x... node scripts/fund-gateway.mjs 0.50
+node scripts/fund-gateway.mjs 0.50
 ```
+
+It prompts for the key with hidden input. Do **not** pass it as `BUYER_PRIVATE_KEY=0x... node ...`
+on the command line: an inline environment assignment is written to `~/.zsh_history` in
+plaintext, where it long outlives the task.
 
 - [ ] Pay for one call:
 
 ```bash
-BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs arc_gas_quote
+node scripts/pay-http.mjs arc_gas_quote
 ```
 
 - [ ] Confirm the payment appears at `/monitor`.

@@ -13,24 +13,19 @@
  * and never written to disk or sent anywhere except as a signature.
  *
  * Usage:
- *   BUYER_PRIVATE_KEY=0x... node scripts/fund-gateway.mjs 0.50
- *   BUYER_PRIVATE_KEY=0x... CHAIN=arcTestnet node scripts/fund-gateway.mjs 1
+ *   node scripts/fund-gateway.mjs 0.50           # prompts for the key, hidden input
+ *   CHAIN=arcTestnet node scripts/fund-gateway.mjs 1
  */
 import { GatewayClient } from "@circle-fin/x402-batching/client";
+import { resolvePrivateKey } from "./lib/prompt-key.mjs";
 
 const amount = process.argv[2] || "0.50";
 const chain = process.env.CHAIN || "arc";
-const privateKey = process.env.BUYER_PRIVATE_KEY;
-
-if (!privateKey) {
-  console.error(
-    "ERROR: set BUYER_PRIVATE_KEY=0x... (a wallet holding USDC on Arc).\n" +
-      "It stays local. Never commit it, never paste it into a chat, never put it in .dev.vars.",
-  );
-  process.exit(1);
-}
-if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
-  console.error("ERROR: BUYER_PRIVATE_KEY must be 0x followed by 64 hex characters.");
+let privateKey;
+try {
+  privateKey = await resolvePrivateKey("BUYER_PRIVATE_KEY");
+} catch (e) {
+  console.error("ERROR:", e.message);
   process.exit(1);
 }
 
@@ -49,4 +44,4 @@ console.log(`  depositor  : ${result.depositor}`);
 
 const balances = await client.getBalances();
 console.log("\nbalances now:", JSON.stringify(balances, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2));
-console.log("\nNext: BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs arc_gas_quote");
+console.log("\nNext: node scripts/pay-http.mjs arc_gas_quote");

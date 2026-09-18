@@ -13,24 +13,23 @@
  * YOUR KEY STAYS ON YOUR MACHINE. Only an EIP-3009 signature leaves it, and payments are gasless.
  *
  * Usage:
- *   BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs
- *   BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs arc_asset_verify '{"address":"0x3600000000000000000000000000000000000000"}'
- *   BASE=https://your-worker.workers.dev BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs
+ *   node scripts/pay-http.mjs                    # prompts for the key, hidden input
+ *   node scripts/pay-http.mjs arc_asset_verify '{"address":"0x3600000000000000000000000000000000000000"}'
+ *   BASE=https://your-worker.workers.dev node scripts/pay-http.mjs
  */
 import { GatewayClient } from "@circle-fin/x402-batching/client";
+import { resolvePrivateKey } from "./lib/prompt-key.mjs";
 
 const base = (process.env.BASE || "https://arc-agent-toolkit-prod.ktcod.workers.dev").replace(/\/$/, "");
 // arc_gas_quote is joint-cheapest at $0.001 — the least expensive way to trigger a real settle.
 const tool = process.argv[2] || "arc_gas_quote";
 const rawArgs = process.argv[3] || "{}";
 const chain = process.env.CHAIN || "arc";
-const privateKey = process.env.BUYER_PRIVATE_KEY;
-
-if (!privateKey) {
-  console.error(
-    "ERROR: set BUYER_PRIVATE_KEY=0x... (a wallet with a Gateway balance on Arc).\n" +
-      "Run scripts/fund-gateway.mjs first. The key stays local; only a signature is sent.",
-  );
+let privateKey;
+try {
+  privateKey = await resolvePrivateKey("BUYER_PRIVATE_KEY");
+} catch (e) {
+  console.error("ERROR:", e.message);
   process.exit(1);
 }
 
@@ -65,7 +64,7 @@ try {
   const msg = e instanceof Error ? e.message : String(e);
   console.error("NOT SETTLED —", msg);
   if (/insufficient_balance/i.test(msg)) {
-    console.error("\nNo Gateway balance. Run: BUYER_PRIVATE_KEY=0x... node scripts/fund-gateway.mjs 0.50");
+    console.error("\nNo Gateway balance. Run: node scripts/fund-gateway.mjs 0.50");
   } else if (/invalid_signature/i.test(msg)) {
     console.error("\ninvalid_signature with a correct key means the EIP-712 domain is wrong.");
     console.error("Check the server registers GatewayEvmScheme, not the base ExactEvmScheme.");
