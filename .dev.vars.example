@@ -8,4 +8,4 @@ X402_FACILITATOR_URL=https://gateway-api-testnet.circle.com
 
 # Set after deploying contracts/script/Deploy.s.sol — makes arc_asset_verify read on-chain
 # instead of the built-in fallback table.
-# ARC_REGISTRY_ADDRESS=0x...
+# ARC_REGISTRY_ADDRESS=0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211

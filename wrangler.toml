@@ -31,3 +31,7 @@ X402_MODE = "production"
 X402_NETWORK = "eip155:5042"
 X402_FACILITATOR_URL = "https://gateway-api.circle.com"
 PAYOUT_WALLET_ADDRESS = "0x9C1D17a47DB9F3eF9Eeaf747023E2a7CC29c9b66"
+# ArcAssetRegistry, deployed to Arc mainnet 2026-09-18 in block 21564764.
+# With this set, arc_asset_verify reads canonical assets ON-CHAIN and reports
+# registrySource "onchain" rather than falling back to the built-in table.
+ARC_REGISTRY_ADDRESS = "0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211"

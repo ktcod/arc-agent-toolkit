@@ -20,6 +20,21 @@ asset answers can be verified on-chain instead of trusted.
 - **Design:** [docs/superpowers/specs/2026-09-18-arc-agent-toolkit-design.md](docs/superpowers/specs/2026-09-18-arc-agent-toolkit-design.md)
 - **Deploying it yourself:** [OPERATOR_CHECKLIST.md](OPERATOR_CHECKLIST.md)
 
+## Live on Arc mainnet
+
+**ArcAssetRegistry:** [`0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211`](https://explorer.arc.io/address/0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211)
+— deployed 2026-09-18, block 21564764, 15 canonical entries.
+
+Check the service's core claim yourself, without trusting this API:
+
+```bash
+cast call 0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211 "isCanonical(address)(bool)" \
+  0x3600000000000000000000000000000000000000 --rpc-url https://rpc.mainnet.arc.io   # true  (real USDC)
+
+cast call 0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211 "isCanonical(address)(bool)" \
+  0xaaC788737179Cd696d19b1A09c5392033C9127A6 --rpc-url https://rpc.mainnet.arc.io   # false (USDCARC)
+```
+
 ## Why Arc specifically
 
 Arc pays gas in USDC. That one property changes what an agent needs:

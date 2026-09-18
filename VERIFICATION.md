@@ -119,7 +119,37 @@ against genuine USDC at `0x3600000000000000000000000000000000000000`.
 fixture in both `test/arcAssetVerify.ts` and the Foundry test for the registry contract, so the
 real impersonator must keep reading as non-canonical for the suite to pass.
 
-## 10. Blockscout's API is not reachable from a server
+## 10. The registry is deployed and answering on Arc mainnet
+
+**Deployed** 2026-09-18 in block **21564764**, to
+[`0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211`](https://explorer.arc.io/address/0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211).
+Deployment plus seeding cost **0.057 USDC** in gas across two transactions.
+
+**Checked** against the live contract:
+
+```
+count()                                              -> 15
+isCanonical(0x3600…0000)   real USDC                 -> true
+isCanonical(0xaaC7…27A6)   the USDCARC impersonator  -> false
+symbolOf(0x3600…0000)                                -> "USDC"
+canonicalOf("EURC")                                  -> 0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1
+```
+
+And end-to-end through the tool, with `ARC_REGISTRY_ADDRESS` set:
+
+| Address | verdict | registrySource |
+|---|---|---|
+| real USDC | `canonical` | `onchain` |
+| `USDCARC` | `impersonator` | `onchain` |
+| EURC | `canonical` | `onchain` |
+| DUKE | `unrelated` | `onchain` |
+
+**Consequence.** `arc_asset_verify` no longer asks you to trust this API. Anyone can run the
+`cast call` above and check the answer themselves. If the contract read fails, the service falls
+back to the built-in table and says so via `registrySource: "builtin"` rather than erroring —
+a registry outage degrades independence, not correctness.
+
+## 11. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.
