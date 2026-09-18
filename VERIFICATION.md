@@ -263,7 +263,42 @@ an easy mistake is a bad procedure:
 Local scrubbing of history files was verified, but it does not undo the exposure. The key left
 the machine, so rotation was the only real remedy.
 
-## 16. Blockscout's API is not reachable from a server
+## 16. GatewayClient.pay() hides the reason a payment failed
+
+A real failed payment reported exactly this, and nothing else:
+
+```
+NOT SETTLED — Payment failed:
+```
+
+The reason is empty because of what Circle's SDK does on a non-ok response
+(`@circle-fin/x402-batching@3.5.0`, `dist/client/index.mjs`):
+
+```js
+const error = await paidResponse.json().catch(() => ({}));
+throw new Error(`Payment failed: ${error.error || paidResponse.statusText}`);
+```
+
+It looks for the reason in the response **body**. An x402 server returns it in the
+`payment-required` **response header**, and `statusText` is empty over HTTP/2, which is what
+Cloudflare Workers serve. Both fall back to nothing.
+
+**Consequence.** `scripts/pay-http.mjs` drives `BatchEvmScheme` directly rather than calling
+`GatewayClient.pay()`, so it reads the header and can distinguish `insufficient_balance` from
+`invalid_signature` from `unauthorized`. That distinction is the entire difference between a
+fixable problem and a mystery.
+
+Confirmed working afterwards, against the live service:
+
+| Payer | Reported reason |
+|---|---|
+| random unfunded key | `insufficient_balance` |
+| the well-known Hardhat key `0xf39F…2266` | `unauthorized` — Circle blocklists publicly-known keys |
+
+The second is worth writing down: it looked at first like a new bug, and it is simply Gateway
+correctly refusing a key that everybody has.
+
+## 17. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.
