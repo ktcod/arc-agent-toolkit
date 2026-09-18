@@ -29,45 +29,41 @@ let privateKey;
 try {
   privateKey = await resolvePrivateKey("BUYER_PRIVATE_KEY");
 } catch (e) {
-  console.error("ERROR:", e.message);
-  process.exit(1);
-}
-
-let body;
-try {
-  body = JSON.parse(rawArgs);
-} catch {
-  console.error(`ERROR: arguments must be valid JSON. Got: ${rawArgs}`);
-  process.exit(1);
-}
-
-const url = `${base}/x402/${tool}`;
-const client = new GatewayClient({ chain, privateKey });
-
-console.error(`endpoint : ${url}`);
-console.error(`args     : ${JSON.stringify(body)}`);
-console.error("paying on the 402...\n");
-
-try {
-  const result = await client.pay(url, {
-    method: "POST",
-    body,
-    headers: { "content-type": "application/json" },
-  });
-  console.error(`HTTP ${result.status}`);
-  console.error(`paid        : ${result.formattedAmount} USDC`);
-  console.error(`settlement  : ${result.transaction}`);
-  console.error("\nIt should now appear at " + base + "/monitor");
-  console.log("\nResult:");
-  console.log(JSON.stringify(result.data, null, 2));
-} catch (e) {
+  // Surface EVERYTHING. Gateway's useful detail often rides on e.cause or a nested response
+  // body rather than e.message, and an empty "Payment failed:" tells you nothing at all.
   const msg = e instanceof Error ? e.message : String(e);
-  console.error("NOT SETTLED —", msg);
+  console.error(`NOT SETTLED — ${msg || "(the error carried no message)"}`);
+
+  const seen = new Set();
+  const dump = (label, value, depth = 0) => {
+    if (value == null || depth > 3 || seen.has(value)) return;
+    if (typeof value === "object") seen.add(value);
+    if (typeof value === "string" || typeof value === "number") {
+      console.error(`  ${label}: ${value}`);
+      return;
+    }
+    if (typeof value !== "object") return;
+    for (const key of ["message", "error", "errorReason", "invalidReason", "reason", "code", "status", "statusText", "detail", "details", "body", "data", "response", "cause"]) {
+      if (key in value && value[key] != null) dump(`${label}.${key}`, value[key], depth + 1);
+    }
+  };
+  if (e && typeof e === "object") {
+    dump("error", e);
+    try {
+      const flat = JSON.stringify(e, Object.getOwnPropertyNames(e));
+      if (flat && flat !== "{}") console.error(`  raw: ${flat.slice(0, 1200)}`);
+    } catch {}
+  }
+
   if (/insufficient_balance/i.test(msg)) {
     console.error("\nNo Gateway balance. Run: node scripts/fund-gateway.mjs 0.50");
   } else if (/invalid_signature/i.test(msg)) {
     console.error("\ninvalid_signature with a correct key means the EIP-712 domain is wrong.");
     console.error("Check the server registers GatewayEvmScheme, not the base ExactEvmScheme.");
+  } else {
+    console.error("\nIf the payer address equals the seller's payTo address, Gateway may be");
+    console.error("refusing a self-payment. Try a separate buyer wallet.");
+    console.error("Server health is independently checkable with: node scripts/diagnose-paywall.mjs");
   }
   process.exit(1);
 }
