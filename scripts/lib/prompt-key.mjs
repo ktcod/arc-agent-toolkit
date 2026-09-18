@@ -11,7 +11,19 @@
 import { createInterface } from "node:readline";
 import { stdin, stdout } from "node:process";
 
-const KEY_RE = /^0x[0-9a-fA-F]{64}$/;
+/**
+ * Accept the key with or without the 0x prefix.
+ *
+ * MetaMask's "Show private key" exports BARE 64-hex with no prefix, which is the single most
+ * common way to hold this. Demanding 0x rejects a perfectly good key and pushes people toward
+ * pasting it somewhere unsafe to "fix" it, so we normalize instead.
+ */
+const KEY_RE = /^(0x)?[0-9a-fA-F]{64}$/;
+
+/** Add the 0x prefix viem requires, if the user's wallet omitted it. */
+function normalize(raw) {
+  return raw.startsWith("0x") ? raw : `0x${raw}`;
+}
 
 export async function resolvePrivateKey(envVarName = "BUYER_PRIVATE_KEY") {
   const fromEnv = process.env[envVarName];
@@ -19,13 +31,13 @@ export async function resolvePrivateKey(envVarName = "BUYER_PRIVATE_KEY") {
     const trimmed = fromEnv.trim();
     if (!KEY_RE.test(trimmed)) {
       throw new Error(
-        `${envVarName} must be 0x followed by 64 hex characters.\n` +
+        `${envVarName} must be 64 hex characters, with or without a leading 0x.\n` +
           `If you pasted the placeholder literally, substitute your real key — or better, omit ` +
           `the variable entirely and this script will prompt for it without recording it in ` +
           `shell history.`,
       );
     }
-    return trimmed;
+    return normalize(trimmed);
   }
 
   if (!stdin.isTTY) {
@@ -57,7 +69,10 @@ export async function resolvePrivateKey(envVarName = "BUYER_PRIVATE_KEY") {
 
   const key = answer.trim();
   if (!KEY_RE.test(key)) {
-    throw new Error("Not a valid private key (expected 0x followed by 64 hex characters).");
+    throw new Error(
+      `Not a valid private key. Expected 64 hex characters, with or without a leading 0x ` +
+        `(got ${key.length} characters).`,
+    );
   }
-  return key;
+  return normalize(key);
 }
