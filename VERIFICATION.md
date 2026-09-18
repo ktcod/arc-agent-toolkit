@@ -194,7 +194,54 @@ degraded correctly, attaching `balance unavailable: HTTP 400` and rendering `nul
 inventing a figure, so the page stayed honest while the call was wrong. A monitor that had
 defaulted to `0` would have looked perfectly healthy and silently under-reported.
 
-## 13. Blockscout's API is not reachable from a server
+## 13. The paywall verifies correctly end to end (proved without spending anything)
+
+The 402 challenge being well-formed does not prove a *signed* payment is accepted. That path was
+tested separately, and can be re-tested by anyone at any time with no funds and no key:
+
+```
+node scripts/diagnose-paywall.mjs
+```
+
+It generates an ephemeral, zero-balance key, signs a real payment authorization, and reads
+Circle Gateway's verdict. The rejection reason is itself the diagnostic:
+
+| Signature | Gateway verdict | What it proves |
+|---|---|---|
+| valid, wallet unfunded | `insufficient_balance` | signature and EIP-712 domain are **correct**; only funds are missing |
+| one byte corrupted | `invalid_signature` | Gateway really is verifying, rather than short-circuiting on balance |
+
+Observed against the live service on 2026-09-18: exactly those two results. Both are needed. The
+first alone would be consistent with Gateway checking the balance and never examining the
+signature; the second rules that out.
+
+**Consequence.** The server-side paywall is correct. What was broken was the **buyer** script,
+which is a different bug and is covered below.
+
+## 14. The inherited buyer script could never have worked
+
+`scripts/pay-http.mjs` was carried over from the Base project and still called
+`registerExactEvmScheme` from `@x402/evm/exact/client`.
+
+Per the shipped declarations of `@circle-fin/x402-batching`, its `BatchEvmScheme`
+
+> Signs EIP-3009 TransferWithAuthorization against the GatewayWallet contract (from
+> `extra.verifyingContract`) instead of the USDC token contract.
+
+The stock scheme signs against the **token** contract. Gateway therefore rejects the signature as
+`invalid_signature`, and the failure is maddening to diagnose because the 402 challenge looks
+perfectly correct and the server logs nothing wrong.
+
+**Consequence.** `pay-http.mjs` was rewritten around `GatewayClient`, and `fund-gateway.mjs`
+added for the one-time Gateway deposit (which is an approve + deposit that credits you as
+depositor, not a plain transfer to the contract). The stale `pay-test.mjs` was deleted rather
+than left to mislead.
+
+This is worth stating plainly: the phrase "fix the paywall" would have sent most people into the
+server. The server was fine. The client was wrong, and only a test that distinguishes
+`insufficient_balance` from `invalid_signature` tells you which.
+
+## 15. Blockscout's API is not reachable from a server
 
 **Checked.** `curl` against `explorer.arc.io/api/v2/...` returns a Cloudflare interstitial
 (HTTP 403), including for canonical USDC. A browser reaches the same URL fine.

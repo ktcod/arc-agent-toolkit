@@ -1,90 +1,74 @@
 #!/usr/bin/env node
 /**
- * Buyer-side x402 test client for the PER-TOOL HTTP routes (`POST /x402/<tool>`).
+ * Buyer-side client: pay for one tool call with USDC on Arc, via Circle Nanopayments.
  *
- * Distinct from pay-test.mjs, which exercises the MCP endpoint with a JSON-RPC body. These routes
- * are the ones the x402 Bazaar can actually index, and a settlement made through them carries the
- * `http` discovery declaration — which is what CDP needs in order to catalog the resource.
+ * Requires a Gateway balance first — run scripts/fund-gateway.mjs once.
  *
- * The payer key stays on your machine; only an EIP-3009 signature leaves it. Payment is gasless
- * for the payer (the facilitator submits the transaction), so the wallet needs USDC and no ETH.
+ * WHY THIS USES GatewayClient AND NOT THE STANDARD x402 CLIENT: Circle's batched scheme signs
+ * the EIP-3009 authorization against the GatewayWallet contract taken from
+ * extra.verifyingContract, NOT against the USDC token contract. The stock
+ * registerExactEvmScheme signs against the token and produces a signature Gateway rejects as
+ * invalid_signature. The failure is confusing because the 402 challenge looks perfectly fine.
+ *
+ * YOUR KEY STAYS ON YOUR MACHINE. Only an EIP-3009 signature leaves it, and payments are gasless.
  *
  * Usage:
- *   PAYER_PRIVATE_KEY=0x<key> node scripts/pay-http.mjs                       # onchain_gas, $0.001
- *   PAYER_PRIVATE_KEY=0x<key> node scripts/pay-http.mjs treasury_yield_curve '{"days":5}'
- *   X402_BASE_URL=https://x402-json-repair-mcp.agentfund.workers.dev ... node scripts/pay-http.mjs
+ *   BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs
+ *   BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs arc_asset_verify '{"address":"0x3600000000000000000000000000000000000000"}'
+ *   BASE=https://your-worker.workers.dev BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs
  */
-import { privateKeyToAccount } from "viem/accounts";
-import { wrapFetchWithPayment, x402Client, decodePaymentResponseHeader } from "@x402/fetch";
-import { registerExactEvmScheme } from "@x402/evm/exact/client";
+import { GatewayClient } from "@circle-fin/x402-batching/client";
 
-const base = (process.env.X402_BASE_URL || "https://x402.agentfund.net").replace(/\/$/, "");
-// onchain_gas is the cheapest tool at $0.001 — the least expensive way to trigger a real settle.
-const tool = process.argv[2] || "onchain_gas";
-const args = process.argv[3] || "{}";
-const pk = process.env.PAYER_PRIVATE_KEY;
+const base = (process.env.BASE || "https://arc-agent-toolkit-prod.ktcod.workers.dev").replace(/\/$/, "");
+// arc_gas_quote is joint-cheapest at $0.001 — the least expensive way to trigger a real settle.
+const tool = process.argv[2] || "arc_gas_quote";
+const rawArgs = process.argv[3] || "{}";
+const chain = process.env.CHAIN || "arc";
+const privateKey = process.env.BUYER_PRIVATE_KEY;
 
-if (!pk) {
+if (!privateKey) {
   console.error(
-    "ERROR: set PAYER_PRIVATE_KEY=0x... (a Base wallet holding a little USDC).\n" +
-      "It stays local — only an EIP-3009 signature is sent. No ETH needed.",
+    "ERROR: set BUYER_PRIVATE_KEY=0x... (a wallet with a Gateway balance on Arc).\n" +
+      "Run scripts/fund-gateway.mjs first. The key stays local; only a signature is sent.",
   );
   process.exit(1);
 }
 
 let body;
 try {
-  body = JSON.parse(args);
+  body = JSON.parse(rawArgs);
 } catch {
-  console.error(`ERROR: arguments must be valid JSON. Got: ${args}`);
+  console.error(`ERROR: arguments must be valid JSON. Got: ${rawArgs}`);
   process.exit(1);
 }
 
-const account = privateKeyToAccount(pk.startsWith("0x") ? pk : `0x${pk}`);
-const client = new x402Client();
-registerExactEvmScheme(client, { signer: account });
-const fetchWithPay = wrapFetchWithPayment(fetch, client);
-
 const url = `${base}/x402/${tool}`;
-console.error(`Payer:    ${account.address}`);
-console.error(`Endpoint: ${url}`);
-console.error(`Args:     ${JSON.stringify(body)}`);
-console.error("Calling (will pay on the 402)...\n");
+const client = new GatewayClient({ chain, privateKey });
 
-const res = await fetchWithPay(url, {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(body),
-});
+console.error(`endpoint : ${url}`);
+console.error(`args     : ${JSON.stringify(body)}`);
+console.error("paying on the 402...\n");
 
-console.error(`HTTP ${res.status}`);
-
-const receipt = res.headers.get("payment-response") || res.headers.get("x-payment-response");
-if (receipt) {
-  try {
-    console.error("settlement receipt:", JSON.stringify(decodePaymentResponseHeader(receipt)));
-  } catch {
-    console.error("settlement receipt (raw):", receipt.slice(0, 160));
-  }
-} else {
-  // A second 402 means the payment was rejected; the envelope carries the reason.
-  const challenge = res.headers.get("payment-required");
-  if (challenge) {
-    try {
-      const decoded = JSON.parse(Buffer.from(challenge, "base64").toString("utf8"));
-      console.error("NOT SETTLED —", decoded.error);
-    } catch {
-      console.error("NOT SETTLED — could not decode the payment-required header.");
-    }
-  } else {
-    console.error("(no settlement receipt header — check the status above)");
-  }
-}
-
-const text = await res.text();
-console.log("\nResult:");
 try {
-  console.log(JSON.stringify(JSON.parse(text), null, 2));
-} catch {
-  console.log(text.slice(0, 1000));
+  const result = await client.pay(url, {
+    method: "POST",
+    body,
+    headers: { "content-type": "application/json" },
+  });
+  console.error(`HTTP ${result.status}`);
+  console.error(`paid        : ${result.formattedAmount} USDC`);
+  console.error(`settlement  : ${result.transaction}`);
+  console.error("\nIt should now appear at " + base + "/monitor");
+  console.log("\nResult:");
+  console.log(JSON.stringify(result.data, null, 2));
+} catch (e) {
+  const msg = e instanceof Error ? e.message : String(e);
+  console.error("NOT SETTLED —", msg);
+  if (/insufficient_balance/i.test(msg)) {
+    console.error("\nNo Gateway balance. Run: BUYER_PRIVATE_KEY=0x... node scripts/fund-gateway.mjs 0.50");
+  } else if (/invalid_signature/i.test(msg)) {
+    console.error("\ninvalid_signature with a correct key means the EIP-712 domain is wrong.");
+    console.error("Check the server registers GatewayEvmScheme, not the base ExactEvmScheme.");
+  }
+  process.exit(1);
 }

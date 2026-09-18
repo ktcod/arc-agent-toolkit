@@ -86,14 +86,28 @@ npx wrangler deploy --env production
 The submission is much stronger with at least one settled payment, and it is what makes the
 monitor show something.
 
-- [ ] Deposit a small amount of USDC into the Gateway wallet
-      (`0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE`) from a **buyer** EOA. Use
-      `GatewayClient.deposit()` from `@circle-fin/x402-batching/client`, or Circle's own
-      Nanopayments sample app.
+First confirm the paywall is sound, which needs no key and no money:
+
+```bash
+node scripts/diagnose-paywall.mjs
+```
+
+Expect `insufficient_balance` for a valid signature and `invalid_signature` for a corrupted one.
+That pair proves the EIP-712 domain is right and only funding is missing.
+
+Then, to settle for real:
+
+- [ ] Deposit into the Gateway balance from a **buyer** EOA. This is an approve + deposit that
+      credits you as depositor, **not** a plain transfer to the contract address:
+
+```bash
+BUYER_PRIVATE_KEY=0x... node scripts/fund-gateway.mjs 0.50
+```
+
 - [ ] Pay for one call:
 
 ```bash
-node scripts/pay-http.mjs https://<worker-url>/x402/arc_gas_quote '{"preset":"swap"}'
+BUYER_PRIVATE_KEY=0x... node scripts/pay-http.mjs arc_gas_quote
 ```
 
 - [ ] Confirm the payment appears at `/monitor`.

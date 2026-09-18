@@ -50,6 +50,18 @@ curl -i -X POST https://arc-agent-toolkit-prod.ktcod.workers.dev/x402/arc_gas_qu
   -H 'content-type: application/json' -d '{"preset":"swap"}'
 ```
 
+### Verify the paywall yourself, for free
+
+```bash
+node scripts/diagnose-paywall.mjs
+```
+
+Generates a throwaway zero-balance key, signs a real payment, and reads Circle Gateway's verdict.
+A valid signature returns `insufficient_balance` and a corrupted one returns `invalid_signature`,
+which together prove the signature and EIP-712 domain are correct and only funding is absent.
+
+To actually settle: `node scripts/fund-gateway.mjs 0.50` once, then `node scripts/pay-http.mjs`.
+
 ## On Arc mainnet
 
 **ArcAssetRegistry:** [`0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211`](https://explorer.arc.io/address/0x656F228B9d6314Edd585C951D5fC4A2cb3EBf211)
